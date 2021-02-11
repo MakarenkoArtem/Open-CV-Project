@@ -6,10 +6,23 @@ import pip
 if int(pip.__version__.split(".")[0]) < 21:
     pip.main(['install', 'pip', '--upgrade', '--force-reinstall'])
 """------------------------------------------------------------------------------------------"""
+import site
+import shutil
+
+
+def check():
+    if "platforms" not in listdir(site.getsitepackages()[0]):
+        shutil.move("\\".join([site.getsitepackages()[1], 'PyQt5', "Qt", 'plugins', 'platforms']),
+                    site.getsitepackages()[0])
+
+
+check()
+
 try:
     from PyQt5 import *
 except ModuleNotFoundError:
     pip.main(['install', 'PyQT5'])
+    check()
     from PyQt5 import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
@@ -17,11 +30,11 @@ from PyQt5.QtGui import *
 
 """------------------------------------------------------------------------------------------"""
 try:
-    import cv2
+    from cv2 import *
 except ModuleNotFoundError:
     print("ModuleNotFoundError: модуль opencv-python не найден.")
     pip.main(['install', 'opencv-python'])
-    import cv2
+    from cv2 import *
 """------------------------------------------------------------------------------------------"""
 
 dirs = [int(i.split()[-1]) for i in listdir() if i.split()[0] == 'Way']
@@ -34,7 +47,7 @@ else:
     dirs = f"Way {dirs[-1] + 1}"
 with open(f'{dirs}/read_video_file.py', "w") as file:
     text = ['import cv2\n', '\n', "#cap = cv2.VideoCapture('frame.mp4')\n",
-            "blue = cv2.VideoCapture('output.avi')\n", "#red = cv2.VideoCapture('red.avi')\n",
+            "blue = cv2.VideoCapture('frame.avi')\n", "#red = cv2.VideoCapture('red.avi')\n",
             'from time import sleep\n', 'while 1:\n', '    #ret, frame = cap.read()\n',
             '    #print(ret)\n', '    ret, frame = blue.read()\n',
             "    if cv2.waitKey(1) == ord('q') or not ret:\n", '        break\n',
@@ -100,8 +113,8 @@ class Settings(QWidget, Ui_Dialog):
             mask = bitwise_and(frame, frame, mask=mask)
             pic = resize(mask, (632, 312), interpolation=INTER_AREA)
             pic = cvtColor(pic, COLOR_BGR2RGB)
-            convertToQtFormat = QtGui.QImage(pic.data, 632, 312, QtGui.QImage.Format_RGB888)
-            convertToQtFormat = QtGui.QPixmap.fromImage(convertToQtFormat)
+            convertToQtFormat = QImage(pic.data, 632, 312, QImage.Format_RGB888)
+            convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
             self.label_7.setPixmap(QPixmap(convertToQtFormat))
             self.show()
             # self.out.write(frame)
@@ -116,12 +129,12 @@ class Vision(QWidget, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         try:
-            self.cap = cv2.VideoCapture(number, cv2.CAP_DSHOW)
+            self.cap = VideoCapture(number, CAP_DSHOW)
         except Warning:
             self.cap = VideoCapture(number)
-        fourcc = VideoWriter_fourcc(*'XVID')
-        '''self.out = VideoWriter(f'{di}/frame.mp4', fourcc, 20.0, (640, 480))
-        self.blue = VideoWriter(f'{di}/blue.avi', fourcc, 20.0, (64, 64))
+        fourcc = VideoWriter_fourcc(*"XVID")
+        self.out = VideoWriter(f'{dirs}/frame.avi', fourcc, 20.0, (640, 480))
+        '''self.blue = VideoWriter(f'{di}/blue.avi', fourcc, 20.0, (64, 64))
         self.red = VideoWriter(f'{di}/red.avi', fourcc, 20.0, (64, 64))'''  # запись
         self.number = number
         self.pushButton_3.clicked.connect(self.release)
@@ -148,17 +161,17 @@ class Vision(QWidget, Ui_MainWindow):
             self.cap = VideoCapture(self.number)
 
     def release(self):
-        # self.out.release()
+        self.out.release()
         # self.blue.release()
         # self.red.release()
-        if self.play:
+        if self.play or 1:
             self.play = False
-            self.close()
             self.cap.release()
             print("Надеюсь мы не разбились, жду встречи ;)")
+            destroyAllWindows()
             self.close()
 
-    def sign(self, occasion=1, time=0):
+    def sign(self, occasion=1, time=0.3):
         def color(frame, asd):
             c = self.blue
             color = (0, 0, 255)
@@ -173,133 +186,23 @@ class Vision(QWidget, Ui_MainWindow):
             contours = findContours(pic, RETR_TREE, CHAIN_APPROX_NONE)
             contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
             contour = self.frame[0:64, 0:64]
-            '''if contours:
-                contours = sorted(contours, key=contourArea, reverse=True)
-                #drawContours(frame, contours[0], -1, (0, 255, 0), 3)
-                x, y, w, h = boundingRect(contours[0])
-                rectangle(frame, (x, y), (x + w, y + h), color, 1)
-                contours = pic[y:y + h, x:x + w]
-                contour = (contours, (64, 64))'''
             return pic, contour
 
-        '''
-            r = ["minb", "ming", "minr", "maxb", "maxg", "maxr"]
-
-            def nothing(x):
-                pass
-
-            f = asd + f"result"
-            namedWindow(f)
-            for i in range(6):
-                createTrackbar(r[i], f, c[i], 255, nothing)
-            self.frame = imread('Colors.jpg')
-            while True:
-                # ret, self.frame = self.cap.read()
-                hsv = cvtColor(self.frame, COLOR_BGR2HSV)
-                hsv = blur(hsv, (5, 5))
-                c = []
-                for i in range(6):
-                    c.append(getTrackbarPos(r[i], f))
-                mask = inRange(self.frame, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
-                maskEr = erode(mask, (3, 3), iterations=2)
-                maskDi = dilate(maskEr, (3, 3), iterations=2)
-                imshow("Dilate", maskDi)
-                result = bitwise_and(self.frame, self.frame, mask=mask)
-                imshow(f, result)
-                if waitKey(1) == ord("q"):
-                    break
-            destroyAllWindows()
-            return [minb, ming, minr, maxb, maxg, maxr]
-
-        inp = input(
-            "Если вы хотите сами написать границы, то напишите 'w', если вы хотите готовые границы, то напишите 'r', если хотите подобрать границы, то напишите любую другую букву или не пишите ничего, ввод: ")
-        if inp == "w":
-            r = list(int(i) for i in input("Red: ").split(", "))
-            b = list(int(i) for i in input("Blue: ").split(", "))
-        elif inp == "r":
-            r = [0, 10, 175, 20, 140, 255]
-            b = [200, 10, 10, 255, 200, 110]
-        else:
-            r = color("red_")
-            b = color("blue_")
-        rn = [(2, 32), (62, 32), (32, 62), (32, 2), (6, 60), (60, 60), (19, 20),
-              (44, 44), (19, 44), (44, 19), (20, 31), (44, 33)]
-        no_entry = [True, True, True, True, False, False, True, True, True, True, True,
-                    True]
-        stop_is_prohibited = [True, True, True, True, False, False, True, True, True,
-                              True, False, False]
-        no_parking = [True, True, True, True, False, False, True, True, False, False,
-                      False, False]
-        speed = [True, True, True, True, False, False, False, False, False, False,
-                 False, False]
-        bn = [(3, 3), (3, 60), (60, 3), (60, 60), (28, 3), (38, 3), (31, 25), (42, 13), (22, 13)]
-        pedestrian_crossing = [True, True, True, True, True, True, False, True, True]
-        park = [True, True, True, True, True, True, True, False, False]
-        m = ''
-        ma = '''
-        # self.func = self.sign
-        for i in range(occasion):
-            print(self.play)
-            if not self.play:
-                break
-            '''if not ret:
-                continue
-            print(i)
-
-            def e(ca):
-                colo = (0, 0, 255)
-                c = r
-                rnt = rn
-                if ca == "Blue":
-                    c = b
-                    rnt = bn
-                    colo = (255, 0, 0)
-                # imshow(ca, ra)
-                contours = findContours(ra, RETR_TREE, CHAIN_APPROX_NONE)
-                contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
-                pic = self.frame[0:64, 0:64]
-                pic = inRange(pic, (0, 0, 0), (100, 100, 100))
-                if contours:
-                    contours = sorted(contours, key=contourArea, reverse=True)
-                    drawContours(self.frame, contours[0], -1, (0, 255, 0), 3)
-                    x, y, w, h = boundingRect(contours[0])
-                    rectangle(self.frame, (x, y), (x + w, y + h), colo, 2)
-                    pic = ra[y:y + h, x:x + w]
-                    pic = resize(pic, (64, 64))
-                imwrite('bw.png', pic)
-                rt = imread('bw.png')
-                rq = []
-                for x, y in rnt:
-                    if pic[y][x]:  # pic
-                        circle(rt, (x, y), 3, (0, 250, 0), -1)  # rt
-                        rq.append(True)
-                    else:
-                        circle(rt, (x, y), 3, colo, -1)  # rt
-                        rq.append(False)
-                imshow(ca, rt)  # rt
-                if ca == "Blue":
-                    self.blue.write(rt)
-                else:
-                    self.red.write(rt)
-                return rq
-
-            rrb = e("Red")
-
-            # putText(self.frame, m, (50, 40), FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 2)'''
-
-            # self.func = self.sign
+        for _ in range(occasion):
             def insert(pic, widget):
                 pic = cvtColor(pic, COLOR_BGR2RGB)
-                convertToQtFormat = QtGui.QImage(pic.data, pic.shape[1], pic.shape[0],
-                                                 QtGui.QImage.Format_RGB888)
-                convertToQtFormat = QtGui.QPixmap.fromImage(convertToQtFormat)
+                convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0],
+                                                 QImage.Format_RGB888)
+                convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
                 widget.setPixmap(QPixmap(convertToQtFormat))
-
+            if not self.play:
+                break
             ret, self.frame = self.cap.read()
-            print(ret)
+            print(ret, self.frame.shape)
             if not ret:
                 self.frame = imread('Colors.jpg')
             try:
+                self.out.write(self.frame)
                 self.frame = resize(self.frame, (352, 300))
                 insert(self.frame, self.label)
                 blue, contours = color(self.frame, 'blue')
@@ -310,10 +213,9 @@ class Vision(QWidget, Ui_MainWindow):
                 pic = bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
                 self.show()
-            except Exception:
-                pass
+            except Exception as e:
+                print(e.__class__.__name__)
             # imshow("Frame", self.frame)
-            # self.out.write(self.frame)
             if waitKey(1) == ord("q"):
                 pass
             sleep(time)
@@ -325,6 +227,8 @@ class Vision(QWidget, Ui_MainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     f = Vision(0)
+    print(1)
+    f.show()
     f.sign(1000)
-    f.release()
+    #f.release()
     sys.exit(app.exec())
