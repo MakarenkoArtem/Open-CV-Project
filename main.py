@@ -30,11 +30,11 @@ from PyQt5.QtGui import *
 
 """------------------------------------------------------------------------------------------"""
 try:
-    from cv2 import *
+    import cv2
 except ModuleNotFoundError:
     print("ModuleNotFoundError: модуль opencv-python не найден.")
     pip.main(['install', 'opencv-python'])
-    from cv2 import *
+    import cv2
 """------------------------------------------------------------------------------------------"""
 
 dirs = [int(i.split()[-1]) for i in listdir() if i.split()[0] == 'Way']
@@ -45,15 +45,25 @@ if not len(dirs):
 else:
     mkdir(f"Way {dirs[-1] + 1}")
     dirs = f"Way {dirs[-1] + 1}"
+# with open(f'Way 26/read_video_file.py', "r") as file:
+#    print(file.readlines())
 with open(f'{dirs}/read_video_file.py', "w") as file:
-    text = ['import cv2\n', '\n', "#cap = cv2.VideoCapture('frame.mp4')\n",
-            "blue = cv2.VideoCapture('frame.avi')\n", "#red = cv2.VideoCapture('red.avi')\n",
-            'from time import sleep\n', 'while 1:\n', '    #ret, frame = cap.read()\n',
-            '    #print(ret)\n', '    ret, frame = blue.read()\n',
-            "    if cv2.waitKey(1) == ord('q') or not ret:\n", '        break\n',
-            "    cv2.imshow('blue', frame)\n", "    #cv2.imshow('frame', frame)\n",
-            '    #ret, frame = red.read()\n', "    #cv2.imshow('red', frame)\n", '    sleep(0.02)\n',
-            '#cap.release()\n', '#red.release()\n', 'blue.release()\n', 'cv2.destroyAllWindows()\n']
+    text = ['import cv2\n', '\n', "cap = cv2.VideoCapture('frame.avi')\n",
+            "blue = cv2.VideoCapture('blue.avi')\n", "red = cv2.VideoCapture('red.avi')\n",
+            'time = 0.2\n', 'def click(event, x, y, flags, param):\n', '    global time\n',
+            '    if event == cv2.EVENT_MOUSEWHEEL:\n', '        if flags > 0:\n',
+            '            time += 0.05\n', '        elif flags < 0:\n', '            time -= 0.05\n',
+            '    if time <= 0:\n', '        time = 0.01\n', 'from time import sleep\n', 'while 1:\n',
+            '    k = [True, True, True]\n', '    ret, frame = cap.read()\n', '    print(1, ret)\n',
+            "    if cv2.waitKey(1) == ord('q') or not ret:\n", '        k[0] = False\n',
+            '    else:\n', "        cv2.imshow('frame', frame)\n", '    ret, frame = blue.read()\n',
+            '    print(2, ret)\n', "    if cv2.waitKey(1) == ord('q') or not ret:\n",
+            '        k[1] = False\n', '    else:\n', "        cv2.imshow('blue', frame)\n",
+            "    cv2.setMouseCallback('blue', click)\n", '    ret, frame = red.read()\n',
+            '    print(3, ret)\n', "    if cv2.waitKey(1) == ord('q') or not ret:\n",
+            '        k[2] = False\n', '    else:\n', "        cv2.imshow('red', frame)\n",
+            '    if k == [False, False, False]:\n', '        break\n', '    sleep(time)\n',
+            'cap.release()\n', 'red.release()\n', 'blue.release()\n', 'cv2.destroyAllWindows()\n']
     for i in text:
         file.write(i)
 from Base import Ui_MainWindow
@@ -65,9 +75,9 @@ class Settings(QWidget, Ui_Dialog):
         super().__init__()
         self.setupUi(self)
         try:
-            self.cap = VideoCapture(number, CAP_DSHOW)
+            self.cap = cv2.VideoCapture(number, cv2.CAP_DSHOW)
         except Warning:
-            self.cap = VideoCapture(number)
+            self.cap = cv2.VideoCapture(number)
         self.color = 38
         if color == 'Blue':
             self.color = 51
@@ -104,24 +114,23 @@ class Settings(QWidget, Ui_Dialog):
         while self.play:
             ret, frame = self.cap.read()
             if not ret:
-                frame = imread('config/Colors.jpg')
-            imgHLS = cvtColor(frame, self.color)
+                frame = cv2.imread('config/Colors.jpg')
+            imgHLS = cv2.cvtColor(frame, self.color)
             print((self.z[0].value(), self.z[1].value(), self.z[2].value()),
                   (self.z[3].value(), self.z[4].value(), self.z[5].value()))
-            mask = inRange(imgHLS, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
-                           (self.z[3].value(), self.z[4].value(), self.z[5].value()))
-            mask = bitwise_and(frame, frame, mask=mask)
-            pic = resize(mask, (632, 312), interpolation=INTER_AREA)
-            pic = cvtColor(pic, COLOR_BGR2RGB)
+            mask = cv2.inRange(imgHLS, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
+                               (self.z[3].value(), self.z[4].value(), self.z[5].value()))
+            mask = cv2.bitwise_and(frame, frame, mask=mask)
+            pic = cv2.resize(mask, (632, 312), interpolation=cv2.INTER_AREA)
+            pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
             convertToQtFormat = QImage(pic.data, 632, 312, QImage.Format_RGB888)
             convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
             self.label_7.setPixmap(QPixmap(convertToQtFormat))
             self.show()
             # self.out.write(frame)
-            if waitKey(1) == ord("q"):
+            if cv2.waitKey(1) == ord("q"):
                 pass
             # sleep(0)
-        destroyAllWindows()
 
 
 class Vision(QWidget, Ui_MainWindow):
@@ -129,13 +138,13 @@ class Vision(QWidget, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         try:
-            self.cap = VideoCapture(number, CAP_DSHOW)
+            self.cap = cv2.VideoCapture(number, cv2.CAP_DSHOW)
         except Warning:
-            self.cap = VideoCapture(number)
-        fourcc = VideoWriter_fourcc(*"XVID")
-        self.out = VideoWriter(f'{dirs}/frame.avi', fourcc, 20.0, (640, 480))
-        '''self.blue = VideoWriter(f'{di}/blue.avi', fourcc, 20.0, (64, 64))
-        self.red = VideoWriter(f'{di}/red.avi', fourcc, 20.0, (64, 64))'''  # запись
+            self.cap = cv2.VideoCapture(number)
+        fourcc = cv2.VideoWriter_fourcc(*"XVID")
+        self.out = cv2.VideoWriter(f'{dirs}/frame.avi', fourcc, 24.0, (640, 480))
+        self.blue_f = cv2.VideoWriter(f'{dirs}/blue.avi', fourcc, 20.0, (64, 64))
+        self.red_f = cv2.VideoWriter(f'{dirs}/red.avi', fourcc, 20.0, (64, 64))  # запись
         self.number = number
         self.pushButton_3.clicked.connect(self.release)
         self.pushButton.clicked.connect(self.settings)
@@ -156,19 +165,19 @@ class Vision(QWidget, Ui_MainWindow):
         elif f.output is not None:
             self.red = f.output
         try:
-            self.cap = VideoCapture(self.number, CAP_DSHOW)
+            self.cap = cv2.VideoCapture(self.number, cv2.CAP_DSHOW)
         except Warning:
-            self.cap = VideoCapture(self.number)
+            self.cap = cv2.VideoCapture(self.number)
 
     def release(self):
         self.out.release()
-        # self.blue.release()
-        # self.red.release()
+        self.blue_f.release()
+        self.red_f.release()
         if self.play or 1:
             self.play = False
             self.cap.release()
             print("Надеюсь мы не разбились, жду встречи ;)")
-            destroyAllWindows()
+            cv2.destroyAllWindows()
             self.close()
 
     def sign(self, occasion=1, time=0.3):
@@ -178,48 +187,51 @@ class Vision(QWidget, Ui_MainWindow):
             if asd == "red":
                 color = (255, 0, 0)
                 c = self.red
-            pic = blur(frame, (4, 4))
-            pic = GaussianBlur(pic, (3, 3), 0)
-            pic = erode(pic, (5, 5), iterations=3)
-            pic = dilate(pic, (4, 4), iterations=2)
-            pic = inRange(pic, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
-            contours = findContours(pic, RETR_TREE, CHAIN_APPROX_NONE)
+            pic = cv2.blur(frame, (4, 4))
+            pic = cv2.GaussianBlur(pic, (3, 3), 0)
+            pic = cv2.erode(pic, (5, 5), iterations=3)
+            pic = cv2.dilate(pic, (4, 4), iterations=2)
+            pic = cv2.inRange(pic, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
+            contours = cv2.findContours(pic, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
             contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
             contour = self.frame[0:64, 0:64]
             return pic, contour
 
         for _ in range(occasion):
             def insert(pic, widget):
-                pic = cvtColor(pic, COLOR_BGR2RGB)
+                pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
                 convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0],
-                                                 QImage.Format_RGB888)
+                                           QImage.Format_RGB888)
                 convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
                 widget.setPixmap(QPixmap(convertToQtFormat))
+
             if not self.play:
                 break
             ret, self.frame = self.cap.read()
             print(ret, self.frame.shape)
             if not ret:
-                self.frame = imread('Colors.jpg')
-            try:
+                self.frame = cv2.imread('Colors.jpg')
+            # try:
+            if 1:
                 self.out.write(self.frame)
-                self.frame = resize(self.frame, (352, 300))
+                self.frame = cv2.resize(self.frame, (352, 300))
                 insert(self.frame, self.label)
                 blue, contours = color(self.frame, 'blue')
                 insert(contours, self.label_2)
+                self.blue_f.write(contours)
                 red, contours = color(self.frame, 'red')
                 insert(contours, self.label_4)
+                self.red_f.write(contours)
                 pic = blue + red
-                pic = bitwise_and(self.frame, self.frame, mask=pic)
+                pic = cv2.bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
                 self.show()
-            except Exception as e:
-                print(e.__class__.__name__)
+            # except Exception as e:
+            #    print(e.__class__.__name__)
             # imshow("Frame", self.frame)
-            if waitKey(1) == ord("q"):
+            if cv2.waitKey(1) == ord("q"):
                 pass
             sleep(time)
-        destroyAllWindows()
         self.func = None
         self.i = 0
 
@@ -227,8 +239,7 @@ class Vision(QWidget, Ui_MainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     f = Vision(0)
-    print(1)
     f.show()
     f.sign(1000)
-    #f.release()
+    f.release()
     sys.exit(app.exec())
