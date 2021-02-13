@@ -82,17 +82,17 @@ class Settings(QWidget, Ui_Dialog):
             self.cap = cv2.VideoCapture(number, cv2.CAP_DSHOW)
         except Warning:
             self.cap = cv2.VideoCapture(number)
-        self.color = 38
+        self.color = 'Red'
         if color == 'Blue':
-            self.color = 51
+            self.color = 'Blue'
         self.play = True
         self.setWindowTitle(color)
         self.pushButton_2.clicked.connect(self.ret)
         self.pushButton.clicked.connect(self.ret)
         self.s = [self.spinBox, self.spinBox_2, self.spinBox_3, self.spinBox_4, self.spinBox_5,
                   self.spinBox_6]
-        self.z = [self.horizontalSlider, self.horizontalSlider_2, self.horizontalSlider_3,
-                  self.horizontalSlider_4, self.horizontalSlider_5, self.horizontalSlider_6]
+        self.z = [self.horizontalSlider_3, self.horizontalSlider_2, self.horizontalSlider,
+                  self.horizontalSlider_6, self.horizontalSlider_5, self.horizontalSlider_4]
         for i in range(6):
             self.z[i].setValue(colors[i])
             self.z[i].valueChanged.connect(self.valuechange)
@@ -119,10 +119,8 @@ class Settings(QWidget, Ui_Dialog):
             ret, frame = self.cap.read()
             if not ret:
                 frame = cv2.imread('config/Colors.jpg')
-            imgHLS = cv2.cvtColor(frame, self.color)
-            print((self.z[0].value(), self.z[1].value(), self.z[2].value()),
-                  (self.z[3].value(), self.z[4].value(), self.z[5].value()))
-            mask = cv2.inRange(imgHLS, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
+            #imgHLS = cv2.cvtColor(frame, self.color)
+            mask = cv2.inRange(frame, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
                                (self.z[3].value(), self.z[4].value(), self.z[5].value()))
             mask = cv2.bitwise_and(frame, frame, mask=mask)
             pic = cv2.resize(mask, (632, 312), interpolation=cv2.INTER_AREA)
@@ -131,7 +129,6 @@ class Settings(QWidget, Ui_Dialog):
             convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
             self.label_7.setPixmap(QPixmap(convertToQtFormat))
             self.show()
-            # self.out.write(frame)
             if cv2.waitKey(1) == ord("q"):
                 pass
             # sleep(0)
@@ -158,24 +155,25 @@ class Vision(QWidget, Ui_MainWindow):
         try:
             with open("config/base.json") as file:
                 self.DATA = json.load(file)
-                self.red, self.blue = self.DATA['color']['red'], self.DATA['color']['blue']
+                self.red, self.blue = self.DATA['red']['range'], self.DATA['blue']['range']
         except FileNotFoundError:
             pass
-        self.func = None
+
         self.play = True
 
     def settings(self):
         self.cap.release()
         c, cl = 'Red', self.red
         if self.sender() == self.pushButton_2:
+            print("Blue")
             c, cl = 'Blue', self.blue
-        f = Settings(self.number, c, cl)  # .exec_()
+        f = Settings(self.number, color=c, colors=cl)  # .exec_()
         if self.sender() == self.pushButton_2 and f.output is not None:
             self.blue = f.output
-            self.DATA['color']['blue'] = self.blue
+            self.DATA['blue']['range'] = self.blue
         elif f.output is not None:
             self.red = f.output
-            self.DATA['color']['red'] = self.red
+            self.DATA['red']['range'] = self.red
         try:
             self.cap = cv2.VideoCapture(self.number, cv2.CAP_DSHOW)
         except Warning:
@@ -200,9 +198,9 @@ class Vision(QWidget, Ui_MainWindow):
     def sign(self, occasion=1, delay=0.1):
         def color(frame, asd):
             c = self.blue
-            color = (0, 0, 255)
+            color = (255, 0, 0)
             if asd == "red":
-                color = (255, 0, 0)
+                color = (0, 0, 255)
                 c = self.red
             pic = cv2.blur(frame, (4, 4))
             pic = cv2.GaussianBlur(pic, (3, 3), 0)
@@ -214,11 +212,11 @@ class Vision(QWidget, Ui_MainWindow):
             k = frame[0:64, 0:64]
             if contours:
                 contours = sorted(contours, key=cv2.contourArea, reverse=True)
-                #cv2.drawContours(frame, contours[0], -1, color, 0) # контуры
                 x, y, w, h = cv2.boundingRect(contours[0])
-                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
                 k = frame[y:y + h, x:x + w]
                 k = cv2.resize(k, (64, 64))
+                # cv2.drawContours(frame, contours[0], -1, color, 0) # контуры
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
             contour = pic[0:64, 0:64]
             return k, contour, pic
 
@@ -240,20 +238,20 @@ class Vision(QWidget, Ui_MainWindow):
                 self.frame = cv2.imread('Colors.jpg')
             # try:
             if 1:
-                self.frame_video.write(self.frame)
                 self.frame = cv2.resize(self.frame, (352, 300))
-                insert(self.frame, self.label)
                 blue, contours, blue_pic = color(self.frame, 'blue')
-                #contours = blue#cv2.bitwise_and(self.frame, self.frame, mask=blue)
-                insert(blue, self.label_2)
+                # contours = blue#cv2.bitwise_and(self.frame, self.frame, mask=blue)
+                insert(blue, self.label_4)
                 self.blue_video.write(blue)
                 red, contours, red_pic = color(self.frame, 'red')
-                #contours = blue#contours = cv2.bitwise_and(self.frame, self.frame, mask=blredue)
-                insert(red, self.label_4)
+                # contours = blue#contours = cv2.bitwise_and(self.frame, self.frame, mask=blredue)
+                insert(red, self.label_2)
                 self.red_video.write(red)
                 pic = blue_pic + red_pic
                 pic = cv2.bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
+                insert(self.frame, self.label)
+                self.frame_video.write(self.frame)
                 self.show()
             # except Exception as e:
             #    print(e.__class__.__name__)
@@ -262,7 +260,7 @@ class Vision(QWidget, Ui_MainWindow):
                 pass
             t = delay - time.time() + start
             print(t)
-            #if t > 0:
+            # if t > 0:
             #    time.sleep(t)
             time.sleep(delay)
         self.func = None
@@ -272,7 +270,7 @@ class Vision(QWidget, Ui_MainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     f = Vision(0)
-    #f.show()
+    # f.show()
     f.sign(1000)
     f.release()
     sys.exit(app.exec())
