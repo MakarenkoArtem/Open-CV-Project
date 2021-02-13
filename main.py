@@ -1,7 +1,9 @@
 from os import mkdir, listdir
 import sys
-from time import sleep
+import time
 import pip
+import timeit
+import json
 
 if int(pip.__version__.split(".")[0]) < 21:
     pip.main(['install', 'pip', '--upgrade', '--force-reinstall'])
@@ -53,16 +55,18 @@ with open(f'{dirs}/read_video_file.py', "w") as file:
             'time = 0.2\n', 'def click(event, x, y, flags, param):\n', '    global time\n',
             '    if event == cv2.EVENT_MOUSEWHEEL:\n', '        if flags > 0:\n',
             '            time += 0.05\n', '        elif flags < 0:\n', '            time -= 0.05\n',
-            '    if time <= 0:\n', '        time = 0.01\n', 'from time import sleep\n', 'while 1:\n',
+            '    if time < 0:\n', '        time = 0\n', 'from time import sleep\n', 'while 1:\n',
             '    k = [True, True, True]\n', '    ret, frame = cap.read()\n', '    print(1, ret)\n',
             "    if cv2.waitKey(1) == ord('q') or not ret:\n", '        k[0] = False\n',
-            '    else:\n', "        cv2.imshow('frame', frame)\n", '    ret, frame = blue.read()\n',
+            '    else:\n', "        cv2.imshow('frame', frame)\n",
+            "    cv2.setMouseCallback('frame', click)\n", '    ret, frame = blue.read()\n',
             '    print(2, ret)\n', "    if cv2.waitKey(1) == ord('q') or not ret:\n",
             '        k[1] = False\n', '    else:\n', "        cv2.imshow('blue', frame)\n",
             "    cv2.setMouseCallback('blue', click)\n", '    ret, frame = red.read()\n',
             '    print(3, ret)\n', "    if cv2.waitKey(1) == ord('q') or not ret:\n",
             '        k[2] = False\n', '    else:\n', "        cv2.imshow('red', frame)\n",
-            '    if k == [False, False, False]:\n', '        break\n', '    sleep(time)\n',
+            "    cv2.setMouseCallback('frame', click)\n", '    if k == [False, False, False]:\n',
+            '        break\n', '    sleep(time)\n',
             'cap.release()\n', 'red.release()\n', 'blue.release()\n', 'cv2.destroyAllWindows()\n']
     for i in text:
         file.write(i)
@@ -142,15 +146,21 @@ class Vision(QWidget, Ui_MainWindow):
         except Warning:
             self.cap = cv2.VideoCapture(number)
         fourcc = cv2.VideoWriter_fourcc(*"XVID")
-        self.out = cv2.VideoWriter(f'{dirs}/frame.avi', fourcc, 24.0, (640, 480))
-        self.blue_f = cv2.VideoWriter(f'{dirs}/blue.avi', fourcc, 20.0, (64, 64))
-        self.red_f = cv2.VideoWriter(f'{dirs}/red.avi', fourcc, 20.0, (64, 64))  # запись
+        self.frame_video = cv2.VideoWriter(f'{dirs}/frame.avi', fourcc, 24.0, (640, 480))
+        self.blue_video = cv2.VideoWriter(f'{dirs}/blue.avi', fourcc, 20.0, (64, 64))
+        self.red_video = cv2.VideoWriter(f'{dirs}/red.avi', fourcc, 20.0, (64, 64))  # запись
         self.number = number
         self.pushButton_3.clicked.connect(self.release)
         self.pushButton.clicked.connect(self.settings)
         self.pushButton_2.clicked.connect(self.settings)
         self.i = 0
         self.red, self.blue = [50, 15, 10, 130, 70, 70], [0, 10, 175, 20, 140, 255]
+        try:
+            with open("config/base.json") as file:
+                self.DATA = json.load(file)
+                self.red, self.blue = self.DATA['color']['red'], self.DATA['color']['blue']
+        except FileNotFoundError:
+            pass
         self.func = None
         self.play = True
 
@@ -162,25 +172,32 @@ class Vision(QWidget, Ui_MainWindow):
         f = Settings(self.number, c, cl)  # .exec_()
         if self.sender() == self.pushButton_2 and f.output is not None:
             self.blue = f.output
+            self.DATA['color']['blue'] = self.blue
         elif f.output is not None:
             self.red = f.output
+            self.DATA['color']['red'] = self.red
         try:
             self.cap = cv2.VideoCapture(self.number, cv2.CAP_DSHOW)
         except Warning:
             self.cap = cv2.VideoCapture(self.number)
 
     def release(self):
-        self.out.release()
-        self.blue_f.release()
-        self.red_f.release()
+        self.frame_video.release()
+        self.blue_video.release()
+        self.red_video.release()
         if self.play or 1:
             self.play = False
             self.cap.release()
             print("Надеюсь мы не разбились, жду встречи ;)")
             cv2.destroyAllWindows()
+            try:
+                with open("config/base.json", 'w') as file:
+                    json.dump(self.DATA, file)
+            except FileNotFoundError:
+                pass
             self.close()
 
-    def sign(self, occasion=1, time=0.3):
+    def sign(self, occasion=1, delay=0.1):
         def color(frame, asd):
             c = self.blue
             color = (0, 0, 255)
@@ -194,10 +211,20 @@ class Vision(QWidget, Ui_MainWindow):
             pic = cv2.inRange(pic, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
             contours = cv2.findContours(pic, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
             contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
-            contour = self.frame[0:64, 0:64]
-            return pic, contour
+            k = frame[0:64, 0:64]
+            if contours:
+                contours = sorted(contours, key=cv2.contourArea, reverse=True)
+                #cv2.drawContours(frame, contours[0], -1, color, 0) # контуры
+                x, y, w, h = cv2.boundingRect(contours[0])
+                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+                k = frame[y:y + h, x:x + w]
+                k = cv2.resize(k, (64, 64))
+            contour = pic[0:64, 0:64]
+            return k, contour, pic
 
         for _ in range(occasion):
+            start = time.time()
+
             def insert(pic, widget):
                 pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
                 convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0],
@@ -213,16 +240,18 @@ class Vision(QWidget, Ui_MainWindow):
                 self.frame = cv2.imread('Colors.jpg')
             # try:
             if 1:
-                self.out.write(self.frame)
+                self.frame_video.write(self.frame)
                 self.frame = cv2.resize(self.frame, (352, 300))
                 insert(self.frame, self.label)
-                blue, contours = color(self.frame, 'blue')
-                insert(contours, self.label_2)
-                self.blue_f.write(contours)
-                red, contours = color(self.frame, 'red')
-                insert(contours, self.label_4)
-                self.red_f.write(contours)
-                pic = blue + red
+                blue, contours, blue_pic = color(self.frame, 'blue')
+                #contours = blue#cv2.bitwise_and(self.frame, self.frame, mask=blue)
+                insert(blue, self.label_2)
+                self.blue_video.write(blue)
+                red, contours, red_pic = color(self.frame, 'red')
+                #contours = blue#contours = cv2.bitwise_and(self.frame, self.frame, mask=blredue)
+                insert(red, self.label_4)
+                self.red_video.write(red)
+                pic = blue_pic + red_pic
                 pic = cv2.bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
                 self.show()
@@ -231,7 +260,11 @@ class Vision(QWidget, Ui_MainWindow):
             # imshow("Frame", self.frame)
             if cv2.waitKey(1) == ord("q"):
                 pass
-            sleep(time)
+            t = delay - time.time() + start
+            print(t)
+            #if t > 0:
+            #    time.sleep(t)
+            time.sleep(delay)
         self.func = None
         self.i = 0
 
@@ -239,7 +272,7 @@ class Vision(QWidget, Ui_MainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     f = Vision(0)
-    f.show()
+    #f.show()
     f.sign(1000)
     f.release()
     sys.exit(app.exec())
