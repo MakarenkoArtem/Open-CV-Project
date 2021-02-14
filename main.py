@@ -72,6 +72,7 @@ with open(f'{dirs}/read_video_file.py', "w") as file:
         file.write(i)
 from Base import Ui_MainWindow
 from Settings import Ui_Dialog
+from base_date import *
 
 
 class Settings(QWidget, Ui_Dialog):
@@ -119,7 +120,7 @@ class Settings(QWidget, Ui_Dialog):
             ret, frame = self.cap.read()
             if not ret:
                 frame = cv2.imread('config/Colors.jpg')
-            #imgHLS = cv2.cvtColor(frame, self.color)
+            # imgHLS = cv2.cvtColor(frame, self.color)
             mask = cv2.inRange(frame, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
                                (self.z[3].value(), self.z[4].value(), self.z[5].value()))
             mask = cv2.bitwise_and(frame, frame, mask=mask)
@@ -151,21 +152,25 @@ class Vision(QWidget, Ui_MainWindow):
         self.pushButton.clicked.connect(self.settings)
         self.pushButton_2.clicked.connect(self.settings)
         self.i = 0
-        self.red, self.blue = [50, 15, 10, 130, 70, 70], [0, 10, 175, 20, 140, 255]
+        self.RED_SIGNS = [[i[0], [y == "True" for y in i[1].split(", ")]] for i in
+                          Base_date("config/signs.sqlite3").select(['*'], "Red_signs", 'and', [])]
+        print(self.RED_SIGNS)
+        self.BLUE_SIGNS = [[i[0], [y == "True" for y in i[1].split(", ")]] for i in
+                           Base_date("config/signs.sqlite3").select(['*'], "Blue_signs", 'and', [])]
+        print(self.BLUE_SIGNS)
         try:
             with open("config/base.json") as file:
                 self.DATA = json.load(file)
                 self.red, self.blue = self.DATA['red']['range'], self.DATA['blue']['range']
         except FileNotFoundError:
-            pass
-
+            print("Нет json файла")
+            self.release()
         self.play = True
 
     def settings(self):
         self.cap.release()
         c, cl = 'Red', self.red
         if self.sender() == self.pushButton_2:
-            print("Blue")
             c, cl = 'Blue', self.blue
         f = Settings(self.number, color=c, colors=cl)  # .exec_()
         if self.sender() == self.pushButton_2 and f.output is not None:
@@ -183,25 +188,38 @@ class Vision(QWidget, Ui_MainWindow):
         self.frame_video.release()
         self.blue_video.release()
         self.red_video.release()
-        if self.play or 1:
-            self.play = False
-            self.cap.release()
-            print("Надеюсь мы не разбились, жду встречи ;)")
-            cv2.destroyAllWindows()
-            try:
-                with open("config/base.json", 'w') as file:
-                    json.dump(self.DATA, file)
-            except FileNotFoundError:
-                pass
+        self.play = False
+        self.cap.release()
+        print("Надеюсь мы не разбились, жду встречи ;)")
+        cv2.destroyAllWindows()
+        try:
+            with open("config/base.json", 'w') as file:
+                json.dump(self.DATA, file)
+        except FileNotFoundError:
+            pass
+        finally:
             self.close()
 
-    def sign(self, occasion=1, delay=0.1):
-        def color(frame, asd):
-            c = self.blue
-            color = (255, 0, 0)
+    def sign(self, occasion=2147483647, delay=0.09):
+        if occasion < 0:
+            occasion = 2147483647
+        def insert(pic, widget): # вывод картинки на label
+            pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
+            pic = cv2.resize(pic, (widget.size().width(), widget.size().height()))
+            convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0], QImage.Format_RGB888)
+            convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
+            widget.setPixmap(QPixmap(convertToQtFormat))
+
+        def color(frame, draw_frame, asd="blue"):
             if asd == "red":
                 color = (0, 0, 255)
                 c = self.red
+                list_points = self.RED_SIGNS
+            else:
+                c = self.blue
+                color = (255, 0, 0)
+                list_points = self.BLUE_SIGNS
+            points = self.DATA[asd]['points']
             pic = cv2.blur(frame, (4, 4))
             pic = cv2.GaussianBlur(pic, (3, 3), 0)
             pic = cv2.erode(pic, (5, 5), iterations=3)
@@ -209,49 +227,60 @@ class Vision(QWidget, Ui_MainWindow):
             pic = cv2.inRange(pic, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
             contours = cv2.findContours(pic, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
             contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
-            k = frame[0:64, 0:64]
+            frame_n = frame[0:64, 0:64]
+            k = pic[0:64, 0:64]
             if contours:
                 contours = sorted(contours, key=cv2.contourArea, reverse=True)
                 x, y, w, h = cv2.boundingRect(contours[0])
-                k = frame[y:y + h, x:x + w]
+                k = pic[y:y + h, x:x + w]
                 k = cv2.resize(k, (64, 64))
+                frame_n = frame[y:y + h, x:x + w]
+                frame_n = cv2.resize(frame_n, (64, 64))
                 # cv2.drawContours(frame, contours[0], -1, color, 0) # контуры
-                cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
-            contour = pic[0:64, 0:64]
-            return k, contour, pic
+                cv2.rectangle(draw_frame, (x, y), (x + w, y + h), color, 2)
+            contour = k.copy()
+            cv2.imwrite('bw.png', k)
+            k = cv2.imread('bw.png')
+            point = []
+            for x, y in points:
+                c = color
+                point.append(k[y][x].all())
+                if k[y][x].all():
+                    c = (0, 255, 0)
+                cv2.circle(k, (x, y), 3, c, -1)
+            for i in list_points:
+                # print(i, point)
+                if i[1] == point:
+                    print(i[0])
+                    cv2.putText(draw_frame, i[0].replace("_", " ").capitalize(), (30, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 255), 2)
+                    insert(frame_n, self.label_5)
+                    self.label_6.setText(i[0].replace("_", " ").capitalize())
+
+            return k, frame, pic
 
         for _ in range(occasion):
             start = time.time()
-
-            def insert(pic, widget):
-                pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
-                convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0],
-                                           QImage.Format_RGB888)
-                convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
-                widget.setPixmap(QPixmap(convertToQtFormat))
-
             if not self.play:
                 break
             ret, self.frame = self.cap.read()
-            print(ret, self.frame.shape)
             if not ret:
                 self.frame = cv2.imread('Colors.jpg')
             # try:
             if 1:
-                self.frame = cv2.resize(self.frame, (352, 300))
-                blue, contours, blue_pic = color(self.frame, 'blue')
+                frame = self.frame.copy()
+                blue, contours, blue_pic = color(self.frame, frame, 'blue')
                 # contours = blue#cv2.bitwise_and(self.frame, self.frame, mask=blue)
                 insert(blue, self.label_4)
                 self.blue_video.write(blue)
-                red, contours, red_pic = color(self.frame, 'red')
+                red, contours, red_pic = color(self.frame, frame, 'red')
                 # contours = blue#contours = cv2.bitwise_and(self.frame, self.frame, mask=blredue)
                 insert(red, self.label_2)
                 self.red_video.write(red)
                 pic = blue_pic + red_pic
                 pic = cv2.bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
-                insert(self.frame, self.label)
-                self.frame_video.write(self.frame)
+                insert(frame, self.label)
+                self.frame_video.write(frame)
                 self.show()
             # except Exception as e:
             #    print(e.__class__.__name__)
@@ -259,18 +288,20 @@ class Vision(QWidget, Ui_MainWindow):
             if cv2.waitKey(1) == ord("q"):
                 pass
             t = delay - time.time() + start
-            print(t)
-            # if t > 0:
-            #    time.sleep(t)
-            time.sleep(delay)
+            if t > 0:
+               time.sleep(t)
         self.func = None
-        self.i = 0
 
 
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
+
+
+"""self.output - переменная во всех класса для передачи информации после завершения работы класса"""
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    sys.excepthook = except_hook
     f = Vision(0)
-    # f.show()
     f.sign(1000)
     f.release()
     sys.exit(app.exec())
