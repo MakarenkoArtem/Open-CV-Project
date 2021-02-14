@@ -1,4 +1,4 @@
-from os import mkdir, listdir
+from os import mkdir, listdir, remove
 import sys
 import time
 import pip
@@ -192,6 +192,10 @@ class Vision(QWidget, Ui_MainWindow):
         self.cap.release()
         print("Надеюсь мы не разбились, жду встречи ;)")
         cv2.destroyAllWindows()
+        try:
+            remove("bw.png")
+        except FileNotFoundError:
+            pass
         try:
             with open("config/base.json", 'w') as file:
                 json.dump(self.DATA, file)
