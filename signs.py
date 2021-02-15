@@ -25,6 +25,9 @@ class Sign(QWidget, Ui_Dialog):
         self.bool = False
         self.im = None
         self.red = True
+        self.pushButton.setEnabled(False)
+        self.pushButton_2.setEnabled(False)
+        self.pushButton_3.setEnabled(False)
         self.radioButton.setEnabled(False)
         self.radioButton_2.setEnabled(False)
         self.buttonGroup.buttonClicked.connect(self.frequency)
@@ -41,6 +44,9 @@ class Sign(QWidget, Ui_Dialog):
 
     def frequency(self):  # метод выбора частоты события
         self.bool = True
+        self.pushButton.setEnabled(True)
+        self.pushButton_2.setEnabled(True)
+        self.pushButton_3.setEnabled(True)
         self.radioButton.setEnabled(True)
         self.radioButton_2.setEnabled(True)
         self.red = self.buttonGroup.checkedId() == -3
@@ -119,4 +125,9 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     f = Sign()
     f.show()
+    try:
+        os.remove("input.png")
+        os.remove("input1.png")
+    except FileNotFoundError:
+        pass
     sys.exit(app.exec())
