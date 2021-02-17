@@ -59,6 +59,7 @@ class Sign(QWidget, Ui_Dialog):
                                   z=[self.lineEdit.text(), ", ".join([str(i) for i in base]),
                                      ", ".join([f"{x}:{y}" for x, y in self.new_points]),
                                      ", ".join([str(i) for i in dop])])
+            self.lineEdit.clear()
             self.picture()
 
     def run(self):
@@ -97,7 +98,6 @@ class Sign(QWidget, Ui_Dialog):
             cv2.imwrite("input1.png", img)
             image = cv2.imread("input1.png")
         base = []
-        self.points = []
         for x, y in self.points:
             t = False
             color = (255, 0, 0)
