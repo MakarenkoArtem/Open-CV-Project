@@ -33,8 +33,7 @@ class Base_date:  # класс для работы с бд
         con = sqlite3.connect(self.title)
         cur = con.cursor()
         cur.execute(
-            f"""INSERT INTO {table}({str(res)}) VALUES ({', '.join(['?' for _ in range(len(z))])})""",
-            z)
+            f"""INSERT INTO {table} ({str(res)}) VALUES ({', '.join(['?' for _ in range(len(z))])})""", z)
         con.commit()
         con.close()
     '''

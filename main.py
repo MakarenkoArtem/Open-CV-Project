@@ -188,9 +188,10 @@ class Vision(QWidget, Ui_MainWindow):
         self.frame_video.release()
         self.blue_video.release()
         self.red_video.release()
+        if self.play:
+            print("Надеюсь мы не разбились, жду встречи ;)")
         self.play = False
         self.cap.release()
-        print("Надеюсь мы не разбились, жду встречи ;)")
         cv2.destroyAllWindows()
         try:
             remove("bw.png")
@@ -207,7 +208,8 @@ class Vision(QWidget, Ui_MainWindow):
     def sign(self, occasion=2147483647, delay=0.09):
         if occasion < 0:
             occasion = 2147483647
-        def insert(pic, widget): # вывод картинки на label
+
+        def insert(pic, widget):  # вывод картинки на label
             pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
             pic = cv2.resize(pic, (widget.size().width(), widget.size().height()))
             convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0], QImage.Format_RGB888)
@@ -240,7 +242,7 @@ class Vision(QWidget, Ui_MainWindow):
                 k = cv2.resize(k, (64, 64))
                 frame_n = frame[y:y + h, x:x + w]
                 frame_n = cv2.resize(frame_n, (64, 64))
-                # cv2.drawContours(frame, contours[0], -1, color, 0) # контуры
+                # cv2.drawContours(draw_frame, contours[0], -1, color, 0) # контуры
                 cv2.rectangle(draw_frame, (x, y), (x + w, y + h), color, 2)
             contour = k.copy()
             cv2.imwrite('bw.png', k)
@@ -256,10 +258,10 @@ class Vision(QWidget, Ui_MainWindow):
                 # print(i, point)
                 if i[1] == point:
                     print(i[0])
-                    cv2.putText(draw_frame, i[0].replace("_", " ").capitalize(), (30, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 255), 2)
+                    cv2.putText(draw_frame, i[0].replace("_", " ").capitalize(), (30, 50),
+                                cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 255), 2)
                     insert(frame_n, self.label_5)
                     self.label_6.setText(i[0].replace("_", " ").capitalize())
-
             return k, frame, pic
 
         for _ in range(occasion):
@@ -268,7 +270,7 @@ class Vision(QWidget, Ui_MainWindow):
                 break
             ret, self.frame = self.cap.read()
             if not ret:
-                self.frame = cv2.imread('Colors.jpg')
+                self.frame = cv2.imread('config/Colors.jpg')
             # try:
             if 1:
                 frame = self.frame.copy()
@@ -293,7 +295,7 @@ class Vision(QWidget, Ui_MainWindow):
                 pass
             t = delay - time.time() + start
             if t > 0:
-               time.sleep(t)
+                time.sleep(t)
         self.func = None
 
 
