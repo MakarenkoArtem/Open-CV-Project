@@ -38,6 +38,15 @@ except ModuleNotFoundError:
     pip.main(['install', 'opencv-python'])
     import cv2
 """------------------------------------------------------------------------------------------"""
+try:
+    from fuzzywuzzy import fuzz
+except ModuleNotFoundError:
+    print("ModuleNotFoundError: модуль fuzzywuzzy не найден.")
+    pip.main(['install', 'fuzzywuzzy'])
+    from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
+
+"""------------------------------------------------------------------------------------------"""
 
 dirs = [int(i.split()[-1]) for i in listdir() if i.split()[0] == 'Way']
 dirs.sort()
@@ -90,8 +99,8 @@ class Settings(QWidget, Ui_Dialog):
         self.setWindowTitle(color)
         self.pushButton_2.clicked.connect(self.ret)
         self.pushButton.clicked.connect(self.ret)
-        self.s = [self.spinBox, self.spinBox_2, self.spinBox_3, self.spinBox_4, self.spinBox_5,
-                  self.spinBox_6]
+        self.s = [self.spinBox_3, self.spinBox_2, self.spinBox, self.spinBox_6, self.spinBox_5,
+                  self.spinBox_4]
         self.z = [self.horizontalSlider_3, self.horizontalSlider_2, self.horizontalSlider,
                   self.horizontalSlider_6, self.horizontalSlider_5, self.horizontalSlider_4]
         for i in range(6):
@@ -121,12 +130,14 @@ class Settings(QWidget, Ui_Dialog):
             if not ret:
                 frame = cv2.imread('config/Colors.jpg')
             # imgHLS = cv2.cvtColor(frame, self.color)
+            print((self.z[0].value(), self.z[1].value(), self.z[2].value()),
+                  (self.z[3].value(), self.z[4].value(), self.z[5].value()))
             mask = cv2.inRange(frame, (self.z[0].value(), self.z[1].value(), self.z[2].value()),
                                (self.z[3].value(), self.z[4].value(), self.z[5].value()))
             mask = cv2.bitwise_and(frame, frame, mask=mask)
-            pic = cv2.resize(mask, (632, 312), interpolation=cv2.INTER_AREA)
+            pic = cv2.resize(mask, (572, 312), interpolation=cv2.INTER_AREA)
             pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
-            convertToQtFormat = QImage(pic.data, 632, 312, QImage.Format_RGB888)
+            convertToQtFormat = QImage(pic.data, 572, 312, QImage.Format_RGB888)
             convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
             self.label_7.setPixmap(QPixmap(convertToQtFormat))
             self.show()
@@ -151,12 +162,50 @@ class Vision(QWidget, Ui_MainWindow):
         self.pushButton_3.clicked.connect(self.release)
         self.pushButton.clicked.connect(self.settings)
         self.pushButton_2.clicked.connect(self.settings)
-        self.i = 0
-        self.RED_SIGNS = [[i[0], [y == "True" for y in i[1].split(", ")]] for i in
-                          Base_date("config/signs.sqlite3").select(['*'], "Red_signs", 'and', [])]
+        base = Base_date("config/signs.sqlite3").select(['*'], "White_signs", 'and', [])
+        self.WHITE_SIGNS = []
+        for f in base:
+            r = []
+            for i in range(len(f)):
+                k = []
+                if i == 0:
+                    k = f[i]
+                elif i % 2 and f[i] != '':
+                    k = [j.strip() == "True" for j in f[i].split(",")]
+                elif f[i] != '':
+                    k = [[int(m) for m in j.split(":")] for j in f[i].split(",")]
+                r.append(k)
+            self.WHITE_SIGNS.append(r)
+        print(self.WHITE_SIGNS)
+        base = Base_date("config/signs.sqlite3").select(['*'], "Red_signs", 'and', [])
+        self.RED_SIGNS = []
+        for f in base:
+            r = []
+            for i in range(len(f)):
+                k = []
+                if i == 0:
+                    k = f[i]
+                elif i % 2 and f[i] != '':
+                    k = [j.strip() == "True" for j in f[i].split(",")]
+                elif f[i] != '':
+                    k = [[int(m) for m in j.split(":")] for j in f[i].split(",")]
+                r.append(k)
+            self.RED_SIGNS.append(r)
         print(self.RED_SIGNS)
-        self.BLUE_SIGNS = [[i[0], [y == "True" for y in i[1].split(", ")]] for i in
-                           Base_date("config/signs.sqlite3").select(['*'], "Blue_signs", 'and', [])]
+        base = Base_date("config/signs.sqlite3").select(['*'], "Blue_signs", 'and', [])
+        self.BLUE_SIGNS = []
+        for f in base:
+            r = []
+            for i in range(len(f)):
+                k = []
+                if i == 0:
+                    k = f[i]
+                elif i % 2 and f[i] != '':
+                    k = [j.strip() == "True" for j in f[i].split(",")]
+                elif f[i] != '':
+                    k = [[int(m) for m in j.split(":")] for j in f[i].split(",")]
+                r.append(k)
+            self.BLUE_SIGNS.append(r)
         print(self.BLUE_SIGNS)
         try:
             with open("config/base.json") as file:
@@ -211,20 +260,24 @@ class Vision(QWidget, Ui_MainWindow):
 
         def insert(pic, widget):  # вывод картинки на label
             pic = cv2.cvtColor(pic, cv2.COLOR_BGR2RGB)
-            pic = cv2.resize(pic, (widget.size().width(), widget.size().height()))
+            pic = cv2.resize(pic, (
+                widget.size().width(),
+                widget.size().height()))  # размер картинки должен быть кратным 4
             convertToQtFormat = QImage(pic.data, pic.shape[1], pic.shape[0], QImage.Format_RGB888)
             convertToQtFormat = QPixmap.fromImage(convertToQtFormat)
             widget.setPixmap(QPixmap(convertToQtFormat))
 
-        def color(frame, draw_frame, asd="blue"):
+        def color(frame, draw_frame, asd="white"):
+            c = self.DATA[asd]['range']
             if asd == "red":
                 color = (0, 0, 255)
-                c = self.red
                 list_points = self.RED_SIGNS
-            else:
-                c = self.blue
+            elif asd == "blue":
                 color = (255, 0, 0)
                 list_points = self.BLUE_SIGNS
+            else:
+                color = (255, 0, 150)
+                list_points = self.WHITE_SIGNS
             points = self.DATA[asd]['points']
             pic = cv2.blur(frame, (4, 4))
             pic = cv2.GaussianBlur(pic, (3, 3), 0)
@@ -238,30 +291,42 @@ class Vision(QWidget, Ui_MainWindow):
             if contours:
                 contours = sorted(contours, key=cv2.contourArea, reverse=True)
                 x, y, w, h = cv2.boundingRect(contours[0])
-                k = pic[y:y + h, x:x + w]
-                k = cv2.resize(k, (64, 64))
-                frame_n = frame[y:y + h, x:x + w]
-                frame_n = cv2.resize(frame_n, (64, 64))
-                # cv2.drawContours(draw_frame, contours[0], -1, color, 0) # контуры
-                cv2.rectangle(draw_frame, (x, y), (x + w, y + h), color, 2)
+                if (w > 60 or h > 60) and h * w >= 3800:
+                    k = pic[y:y + h, x:x + w]
+                    k = cv2.resize(k, (64, 64))
+                    frame_n = frame[y:y + h, x:x + w]
+                    frame_n = cv2.resize(frame_n, (64, 64))
+                    # cv2.drawContours(draw_frame, contours[0], -1, color, 0) # контуры
+                    cv2.rectangle(draw_frame, (x, y), (x + w, y + h), color, 2)
             contour = k.copy()
             cv2.imwrite('bw.png', k)
             k = cv2.imread('bw.png')
             point = []
             for x, y in points:
                 c = color
-                point.append(k[y][x].all())
-                if k[y][x].all():
+                point.append(contour[y][x].all())
+                if contour[y][x].all():
                     c = (0, 255, 0)
                 cv2.circle(k, (x, y), 3, c, -1)
-            for i in list_points:
-                # print(i, point)
-                if i[1] == point:
-                    print(i[0])
-                    cv2.putText(draw_frame, i[0].replace("_", " ").capitalize(), (30, 50),
-                                cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 255), 2)
-                    insert(frame_n, self.label_5)
-                    self.label_6.setText(i[0].replace("_", " ").capitalize())
+            list_points = [i for i in list_points if
+                           fuzz.ratio(i[1], point) >= 85]  # нечёткое сравнение контуров знаков
+            if asd == "white":
+                print(list_points)
+            z = []
+            for sign in list_points:
+                num = []
+                for i in range(2, (2 + len(sign[2:])) // 2):
+                    print(i)
+                    num.append(fuzz.ratio([contour[y][x] for x, y in sign[i* 2]], sign[i*2 + 1]))
+                z.append([sum(num) / len(num), sign[0]])
+            z.sort()
+            if asd == "white":
+                print(z)
+            if len(z) and (z[0][0] > 70 or (asd == "white" and z[0][0] > 60)):
+                cv2.putText(draw_frame, z[0][1].replace("_", " ").capitalize(), (30, 50),
+                            cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+                insert(frame_n, self.label_5)
+                self.label_6.setText(z[0][1].replace("_", " ").capitalize())
             return k, frame, pic
 
         for _ in range(occasion):
@@ -281,8 +346,10 @@ class Vision(QWidget, Ui_MainWindow):
                 red, contours, red_pic = color(self.frame, frame, 'red')
                 # contours = blue#contours = cv2.bitwise_and(self.frame, self.frame, mask=blredue)
                 insert(red, self.label_2)
+                white, contours, white_pic = color(self.frame, frame, 'white')
+                insert(white, self.label_7)
                 self.red_video.write(red)
-                pic = blue_pic + red_pic
+                pic = blue_pic + red_pic + white_pic
                 pic = cv2.bitwise_and(self.frame, self.frame, mask=pic)
                 insert(pic, self.label_3)
                 insert(frame, self.label)

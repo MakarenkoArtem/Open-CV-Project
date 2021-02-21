@@ -32,6 +32,7 @@ class Base_date:  # класс для работы с бд
     def insert(self, table, res, z):  # метод дополнения данных в бд
         con = sqlite3.connect(self.title)
         cur = con.cursor()
+        print(z)
         cur.execute(
             f"""INSERT INTO {table} ({str(res)}) VALUES ({', '.join(['?' for _ in range(len(z))])})""", z)
         con.commit()

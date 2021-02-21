@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>741</width>
+    <width>787</width>
     <height>435</height>
    </rect>
   </property>
@@ -19,7 +19,7 @@
      <rect>
       <x>10</x>
       <y>10</y>
-      <width>350</width>
+      <width>372</width>
       <height>300</height>
      </rect>
     </property>
@@ -43,9 +43,9 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>380</x>
+      <x>400</x>
       <y>10</y>
-      <width>350</width>
+      <width>372</width>
       <height>300</height>
      </rect>
     </property>
@@ -95,7 +95,7 @@
    <widget class="QLabel" name="label_5">
     <property name="geometry">
      <rect>
-      <x>380</x>
+      <x>450</x>
       <y>330</y>
       <width>64</width>
       <height>64</height>
@@ -108,7 +108,7 @@
    <widget class="QPushButton" name="pushButton_3">
     <property name="geometry">
      <rect>
-      <x>650</x>
+      <x>700</x>
       <y>370</y>
       <width>75</width>
       <height>23</height>
@@ -121,9 +121,9 @@
    <widget class="QLabel" name="label_6">
     <property name="geometry">
      <rect>
-      <x>470</x>
+      <x>530</x>
       <y>340</y>
-      <width>241</width>
+      <width>251</width>
       <height>21</height>
      </rect>
     </property>
@@ -135,13 +135,26 @@ font: 75 10pt &quot;MS Shell Dlg 2&quot;;</string>
      <string>Последний знак</string>
     </property>
    </widget>
+   <widget class="QLabel" name="label_7">
+    <property name="geometry">
+     <rect>
+      <x>360</x>
+      <y>330</y>
+      <width>64</width>
+      <height>64</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>TextLabel</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>741</width>
+     <width>787</width>
      <height>21</height>
     </rect>
    </property>
