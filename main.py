@@ -283,6 +283,7 @@ class Vision(QWidget, Ui_MainWindow):
             pic = cv2.GaussianBlur(pic, (3, 3), 0)
             pic = cv2.erode(pic, (5, 5), iterations=3)
             pic = cv2.dilate(pic, (4, 4), iterations=2)
+            dop = pic.copy()
             pic = cv2.inRange(pic, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
             contours = cv2.findContours(pic, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
             contours = contours[0]  # or [1] в линуксе на ноуте не знаю почему
@@ -296,8 +297,14 @@ class Vision(QWidget, Ui_MainWindow):
                     k = cv2.resize(k, (64, 64))
                     frame_n = frame[y:y + h, x:x + w]
                     frame_n = cv2.resize(frame_n, (64, 64))
+                    dop = frame[y:y + h, x:x + w]
+                    dop = cv2.resize(dop, (64, 64))
                     # cv2.drawContours(draw_frame, contours[0], -1, color, 0) # контуры
                     cv2.rectangle(draw_frame, (x, y), (x + w, y + h), color, 2)
+                else:
+                    dop = dop[0:64, 0:64]
+            else:
+                dop = dop[0:64, 0:64]
             contour = k.copy()
             cv2.imwrite('bw.png', k)
             k = cv2.imread('bw.png')
@@ -308,23 +315,39 @@ class Vision(QWidget, Ui_MainWindow):
                 if contour[y][x].all():
                     c = (0, 255, 0)
                 cv2.circle(k, (x, y), 3, c, -1)
+            '''if asd == "red":
+                print(fuzz.ratio(list_points[0][1], point))'''
             list_points = [i for i in list_points if
-                           fuzz.ratio(i[1], point) >= 85]  # нечёткое сравнение контуров знаков
-            if asd == "white":
-                print(list_points)
+                           fuzz.ratio(i[1], point) > 90]  # нечёткое сравнение контуров знаков
             z = []
+            new_color = {1: "black", 2: "white", 3: "yellow", 4: "red", 5: "blue"}
             for sign in list_points:
                 num = []
-                for i in range(2, (2 + len(sign[2:])) // 2):
-                    print(i)
-                    num.append(fuzz.ratio([contour[y][x] for x, y in sign[i* 2]], sign[i*2 + 1]))
+                for i in range(1, 1 + len(sign[2:]) // 2):
+                    c = self.DATA[new_color[i]]['range']
+                    con = cv2.inRange(dop, (c[0], c[1], c[2]), (c[3], c[4], c[5]))
+                    '''if asd == "white":
+                        print([con[y][x]==255 for x, y in sign[i * 2]], sign[i * 2 + 1])
+                        print(fuzz.ratio([con[y][x]==255 for x, y in sign[i * 2]], sign[i * 2 + 1]))'''
+                    if len(sign[i*2]):
+                        num.append(fuzz.ratio([con[y][x]==255 for x, y in sign[i * 2]], sign[i * 2 + 1]))
+                if not len(num):
+                    num = [100]
                 z.append([sum(num) / len(num), sign[0]])
             z.sort()
-            if asd == "white":
-                print(z)
-            if len(z) and (z[0][0] > 70 or (asd == "white" and z[0][0] > 60)):
-                cv2.putText(draw_frame, z[0][1].replace("_", " ").capitalize(), (30, 50),
-                            cv2.FONT_HERSHEY_PLAIN, 2, (0, 255, 0), 3)
+            #print(asd, z)
+            # if len(z):
+            #    print(z)
+            if len(z) and (z[0][0] > 85 or (asd == "white" and z[0][0] > 76)):
+                if asd == "white":
+                    cv2.putText(draw_frame, z[0][1].replace("_", " ").capitalize(), (30, 150),
+                            cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 150), 3)
+                elif asd == "red":
+                    cv2.putText(draw_frame, z[0][1].replace("_", " ").capitalize(), (30, 100),
+                            cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 0), 3)
+                else:
+                    cv2.putText(draw_frame, z[0][1].replace("_", " ").capitalize(), (30, 50),
+                            cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 200), 3)
                 insert(frame_n, self.label_5)
                 self.label_6.setText(z[0][1].replace("_", " ").capitalize())
             return k, frame, pic
@@ -377,4 +400,9 @@ if __name__ == "__main__":
     f = Vision(0)
     f.sign(1000)
     f.release()
-    sys.exit(app.exec())
+    app.exec()
+    try:
+        remove("bw.png")
+    except FileNotFoundError:
+        pass
+    sys.exit()
